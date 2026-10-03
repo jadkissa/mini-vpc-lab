@@ -2,8 +2,6 @@
 
 A local, AWS-style cloud networking lab built on VirtualBox. It recreates the core ideas of an AWS VPC (public and private subnets, an internet gateway, NAT, route tables, security groups, a bastion host) using real virtual machines.
 
-> Status: work in progress. See the [Roadmap](#roadmap) for what is done and what is next.
-
 ## Why this project
 
 - Prepare for the AWS Solutions Architect Associate (SAA) by understanding networking and architecture from the inside, not only from diagrams.
