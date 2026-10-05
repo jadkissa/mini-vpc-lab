@@ -1,0 +1,28 @@
+# /etc/network/interfaces on the router VM
+
+source /etc/network/interfaces.d/*
+
+# The loopback network interface
+auto lo
+iface lo inet loopback
+
+# NAT adapter (internet side), configured by DHCP from VirtualBox
+allow-hotplug enp0s3
+iface enp0s3 inet dhcp
+iface enp0s3 inet6 auto
+
+# public-net (10.0.1.0/24)
+auto enp0s8
+iface enp0s8 inet static
+        address 10.0.1.1/24
+
+# private-net (10.0.3.0/24)
+auto enp0s9
+iface enp0s9 inet static
+        address 10.0.3.1/24
+
+# Host-Only adapter (management from the host machine)
+# No gateway on purpose: the default route goes through enp0s3
+auto enp0s10
+iface enp0s10 inet static
+        address 192.168.56.10/24

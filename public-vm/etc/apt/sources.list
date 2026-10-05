@@ -1,0 +1,6 @@
+# /etc/apt/sources.list on public-vm and private-vm
+# (the original "deb cdrom:" line is commented out after a no-mirror install)
+
+deb http://deb.debian.org/debian trixie main
+deb http://deb.debian.org/debian trixie-updates main
+deb http://security.debian.org/debian-security trixie-security main
