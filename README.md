@@ -2,7 +2,7 @@
 
 A local, AWS-style cloud networking lab built on VirtualBox. It recreates the core ideas of an AWS VPC (public and private subnets, an internet gateway, NAT, route tables, security groups, a bastion host) using real Debian virtual machines, so the concepts can be learned and practiced without an AWS account.
 
-> Status: work in progress. The network, firewall, and access paths are working. The database and application tiers are next. See the [Roadmap](#roadmap).
+> Status: work in progress. The network, firewall, access paths and the database tier are working. The application tier (Docker services) is next. See the [Roadmap](#roadmap).
 
 ## Why this project
 
@@ -31,14 +31,14 @@ A local, AWS-style cloud networking lab built on VirtualBox. It recreates the co
                         +------+-----+  +-----+------+
                         | public-vm  |  | private-vm |
                         | 10.0.1.10  |  | 10.0.3.10  |
-                        | Nginx      |  | (database) |
+                        | Docker     |  | PostgreSQL |
                         +------------+  +------------+
 ```
 
 - The router is the only path between the two subnets and the internet.
 - The public subnet hosts the web application. Inbound traffic reaches it only through a DNAT rule on the router (port 80).
 - The private subnet hosts the database tier. It can reach the internet outbound (updates, DNS) through NAT, but nothing can initiate a connection into it from outside.
-- The private VM is administered through the public VM, which acts as a bastion host. The firewall allows only SSH (22) from the public VM to the private VM.
+- The private VM is administered through the public VM, which acts as a bastion host. The firewall allows only SSH (22) and PostgreSQL (5432) from the public VM to the private VM.
 - The Host-Only adapter on the router is a management path from the host machine (SSH and testing) and plays the role of the "outside world" for the DNAT demo.
 
 ## Addressing plan
@@ -67,6 +67,7 @@ The private subnet uses 10.0.3.0/24 on purpose: VirtualBox's default NAT network
 | Route tables | Default routes on each VM pointing to the router |
 | Security groups | nftables forward chain with default-deny and explicit allows |
 | EC2 instances | The three Debian VMs |
+| RDS in a private subnet | PostgreSQL on private-vm, one database and one user per service |
 | Bastion host | public-vm as the SSH jump host |
 | GuardDuty / network monitoring (planned) | Suricata IDS on the router |
 
@@ -78,8 +79,8 @@ The private subnet uses 10.0.3.0/24 on purpose: VirtualBox's default NAT network
 | VM | Role | RAM | CPU | Disk |
 |---|---|---|---|---|
 | router | Gateway, NAT, firewall, later IDS | 2048 MB | 2 | 15 GB |
-| public-vm | Web tier (Nginx) | 1024 MB | 1 | 10 GB |
-| private-vm | Database tier | 1024 MB | 1 | 10 GB |
+| public-vm | Web tier (Nginx, Docker) | 2048 MB | 1 | 10 GB |
+| private-vm | Database tier (PostgreSQL) | 1024 MB | 1 | 10 GB |
 
 ## Firewall policy (router, forward chain, default drop)
 
@@ -87,7 +88,8 @@ The private subnet uses 10.0.3.0/24 on purpose: VirtualBox's default NAT network
 |---|---|
 | Established / related traffic | Allow |
 | Host-Only (outside) to public-vm, TCP 80 | Allow (after DNAT) |
-| public-vm to private-vm, TCP 22 | Allow (bastion access only) |
+| public-vm to private-vm, TCP 22 | Allow (bastion access) |
+| public-vm to private-vm, TCP 5432 | Allow (PostgreSQL, from public-vm only) |
 | public and private subnets to internet, TCP 80/443/53, UDP 53, ICMP echo | Allow (updates, DNS, testing) |
 | Anything else, including outside to private-vm | Drop |
 
@@ -98,12 +100,12 @@ Full rules: [`router-vm/etc/nftables.conf`](router-vm/etc/nftables.conf).
 - [x] Phase 0: Design the topology and addressing plan
 - [x] Phase 1: Install the router VM (Debian, no desktop)
 - [x] Phase 2: Router networking: static IPs, IP forwarding, NAT
-- [x] Phase 3: public-vm: install, verify internet access through the router, Nginx
+- [x] Phase 3: public-vm: install, verify internet access through the router, Nginx, Docker (RAM raised to 2 GB)
 - [x] Phase 4a: private-vm: install, verify outbound-only access
 - [x] Phase 5: Access paths: SSH from the host through the router and the bastion (ProxyJump)
 - [x] Phase 6: Security groups: default-deny forward policy with explicit allows, tested both ways
-- [ ] Phase 4b: PostgreSQL on private-vm, listening on its internal address only
-- [ ] Phase 7: Connect the web app to the database across subnets
+- [x] Phase 4b: PostgreSQL on private-vm: two databases with separate users, listening on its internal address only, access limited by pg_hba and the firewall
+- [ ] Phase 7: Run the two FastAPI services (Docker) on public-vm against their databases, behind Nginx
 - [ ] Phase 8: Intrusion detection with Suricata on the router (IDS mode first)
 - [ ] Phase 9: Automation (Vagrant and/or Ansible)
 - [ ] Phase 10: Reproduce the architecture on real AWS with Terraform
@@ -125,7 +127,7 @@ Full rules: [`router-vm/etc/nftables.conf`](router-vm/etc/nftables.conf).
 
 ## Repository layout
 
-Each VM has its own folder. Files under `etc/` sit at the same path they have inside the VM.
+Each VM has its own folder. Files under `etc/` sit at the same path they have inside the VM. Files ending in `.snippet` are excerpts to merge into the existing file, not full replacements.
 
 ```
 mini-vpc-lab/
@@ -147,6 +149,11 @@ mini-vpc-lab/
     README.md
     etc/
       apt/sources.list
+      postgresql/17/main/
+        postgresql.conf.snippet
+        pg_hba.conf.snippet
+    sql/
+      create-databases.sql
 ```
 
 ## Notes and decisions
@@ -154,4 +161,4 @@ mini-vpc-lab/
 - Debian is used for all VMs for consistency (one OS, one set of commands).
 - LocalStack was considered, but it only emulates AWS APIs and does not teach real networking, so real VMs are used.
 - The firewall input chain on the router is still open (accept) so management access is not cut off while the lab is built. Tightening it is a planned hardening step.
-- Between the public and private VMs only SSH is allowed for now. Whether to open the database port from the public VM only, or to use an SSH tunnel, will be decided in Phase 7.
+- Between the public and private VMs only SSH (22) and PostgreSQL (5432) are allowed. The database port is opened from the public VM only, instead of using an SSH tunnel, which would be fragile with several services.

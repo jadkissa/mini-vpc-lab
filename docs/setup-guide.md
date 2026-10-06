@@ -95,7 +95,7 @@ sudo nft list ruleset
 
 ## 4. Create the public VM and the private VM
 
-Create both VMs with 1024 MB RAM, 1 CPU, 10 GB disk and a single adapter:
+Create both VMs with 1024 MB RAM (public-vm is raised to 2048 MB later, see section 9), 1 CPU, 10 GB disk and a single adapter:
 
 | VM | Adapter 1 |
 |---|---|
@@ -197,10 +197,92 @@ The input chain stays open while building the lab so an error does not lock you 
 | private-vm | `sudo apt update` | Works (outbound NAT) |
 | private-vm | `curl -m 3 -sS http://10.0.1.10` | Times out (dropped) |
 
-## 8. After a reboot
+## 8. PostgreSQL on private-vm (database per service)
+
+Install and create one database and one user per service. The SQL is in [`private-vm/sql/create-databases.sql`](../private-vm/sql/create-databases.sql). Set each password interactively so it never appears in files or shell history:
+
+```
+sudo apt install postgresql
+sudo -u postgres psql
+```
+
+Inside `psql`: run the statements from the SQL file, then `\password product_user` and `\password order_user`. Check with `\l` and `\du`.
+
+### 8.1 Listen on the private address
+
+In `/etc/postgresql/17/main/postgresql.conf` (see the [snippet](../private-vm/etc/postgresql/17/main/postgresql.conf.snippet)) set, without a leading `#`:
+
+```
+listen_addresses = 'localhost,10.0.3.10'
+```
+
+```
+sudo systemctl restart postgresql
+sudo ss -tlnp | grep 5432
+```
+
+Expected: `127.0.0.1:5432` and `10.0.3.10:5432` (plus `[::1]:5432`, which is local only).
+
+### 8.2 Who may connect (`pg_hba.conf`)
+
+Add the lines from the [snippet](../private-vm/etc/postgresql/17/main/pg_hba.conf.snippet) after the existing rules. Each user is limited to its own database and to the public VM (`/32` means a single host).
+
+```
+sudo systemctl reload postgresql
+sudo -u postgres psql -c "select line_number, database, user_name, address, netmask, auth_method, error from pg_hba_file_rules;"
+```
+
+The `error` column must be empty and the netmask of the new rules must be `255.255.255.255`.
+
+### 8.3 Firewall
+
+Allow PostgreSQL from the public VM only. The rule is in the forward chain of [`router-vm/etc/nftables.conf`](../router-vm/etc/nftables.conf):
+
+```
+iifname "enp0s8" oifname "enp0s9" ip saddr 10.0.1.10 ip daddr 10.0.3.10 tcp dport 5432 accept
+```
+
+```
+sudo nft -c -f /etc/nftables.conf
+sudo nft -f /etc/nftables.conf
+```
+
+### 8.4 Tests (from public-vm)
+
+```
+sudo apt install postgresql-client
+psql -h 10.0.3.10 -U product_user -d product_db   # connects (asks for the password)
+psql -h 10.0.3.10 -U product_user -d order_db     # refused: no pg_hba.conf entry
+psql -h 10.0.3.10 -U order_user -d product_db     # refused: no pg_hba.conf entry
+```
+
+Docker will NAT container traffic, so connections from containers on public-vm reach the database with the public VM's own address (10.0.1.10), which matches the `pg_hba` and firewall rules.
+
+## 9. Docker on public-vm
+
+1. Power off public-vm and raise its RAM to 2048 MB in VirtualBox, then start it again.
+2. Install Docker and let your user run it:
+
+```
+sudo apt update
+sudo apt install docker.io
+sudo usermod -aG docker $USER
+```
+
+3. Log out and back in, then check `docker --version`.
+
+The services are built as images on the development machine and moved to the VM later, for example:
+
+```
+docker save <image> | gzip | ssh -J <user>@192.168.56.10 <user>@10.0.1.10 "gunzip | docker load"
+```
+
+Secrets (database passwords) are passed to the containers as environment variables at run time and are not stored in images or in this repository.
+
+## 10. After a reboot
 
 Reboot the router and repeat the host test (`curl -I http://192.168.56.10`) to confirm that the rules in `/etc/nftables.conf` and the forwarding setting persist.
 
 ## Next steps
 
-PostgreSQL on private-vm, the application on public-vm, Suricata on the router, then automation. See the roadmap in the README.
+Run the two FastAPI services (Docker) on public-vm behind Nginx, Suricata on the router, then automation. See the roadmap in the README.

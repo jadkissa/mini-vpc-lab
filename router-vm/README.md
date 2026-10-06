@@ -59,7 +59,7 @@ From the host: `curl -I http://192.168.56.10` should return `200 OK` from Nginx 
 
 ## Firewall behavior
 
-- Forward chain: default drop. Allowed: established/related traffic, host to public-vm on port 80 (after DNAT), public-vm to private-vm on port 22 only, both subnets to the internet on 80/443/53 (and ICMP echo for testing).
+- Forward chain: default drop. Allowed: established/related traffic, host to public-vm on port 80 (after DNAT), public-vm to private-vm on ports 22 (SSH) and 5432 (PostgreSQL) only, both subnets to the internet on 80/443/53 (and ICMP echo for testing).
 - Input chain: still open (accept) so management access is not cut off while the lab is built.
 
 ## Planned
