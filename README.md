@@ -13,6 +13,11 @@ A local, AWS-style cloud networking lab built on VirtualBox. It recreates the co
 
 ## Architecture
 
+![Mini-VPC Lab architecture](docs/images/architecture.svg)
+
+<details>
+<summary>Text version of the diagram</summary>
+
 ```
                     Internet
                        |
@@ -34,6 +39,8 @@ A local, AWS-style cloud networking lab built on VirtualBox. It recreates the co
                         | Docker     |  | PostgreSQL |
                         +------------+  +------------+
 ```
+
+</details>
 
 - The router is the only path between the two subnets and the internet.
 - The public subnet hosts the web application. Inbound traffic reaches it only through a DNAT rule on the router (port 80).
@@ -154,6 +161,9 @@ mini-vpc-lab/
   docs/
     setup-guide.md
     troubleshooting.md
+    images/
+      architecture.svg
+      architecture.png
   router-vm/
     README.md
     etc/
