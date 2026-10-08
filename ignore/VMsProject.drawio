@@ -1,0 +1,58 @@
+<mxfile host="Electron">
+  <diagram name="Page-1" id="x5wIjd6KVvYQ42NSewyI">
+    <mxGraphModel dx="665" dy="843" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="Tu5mz0ddjPazwv8GgAfG-1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="&lt;font style=&quot;font-size: 24px;&quot;&gt;Internet&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="250" x="250" y="120" as="geometry" />
+        </mxCell>
+        <mxCell id="Tu5mz0ddjPazwv8GgAfG-2" edge="1" parent="1" style="shape=flexArrow;endArrow=classic;startArrow=classic;html=1;rounded=0;" value="">
+          <mxGeometry height="100" relative="1" width="100" as="geometry">
+            <mxPoint x="380" y="310" as="sourcePoint" />
+            <mxPoint x="380" y="190" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="Tu5mz0ddjPazwv8GgAfG-6" edge="1" parent="1" style="shape=flexArrow;endArrow=classic;startArrow=classic;html=1;rounded=0;" value="">
+          <mxGeometry height="100" relative="1" width="100" as="geometry">
+            <mxPoint x="240" y="640" as="sourcePoint" />
+            <mxPoint x="300" y="440" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="Tu5mz0ddjPazwv8GgAfG-7" parent="1" style="points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];outlineConnect=0;gradientColor=none;html=1;whiteSpace=wrap;fontSize=12;fontStyle=0;container=1;pointerEvents=0;collapsible=0;recursiveResize=0;shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_on_premise;strokeColor=#7D8998;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontColor=#5A6C86;dashed=0;" value="&lt;font style=&quot;font-size: 24px;&quot;&gt;Public VM&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="220" x="110" y="660" as="geometry" />
+        </mxCell>
+        <mxCell id="Tu5mz0ddjPazwv8GgAfG-9" parent="Tu5mz0ddjPazwv8GgAfG-7" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;font style=&quot;font-size: 24px;&quot;&gt;10.0.1.0/24&lt;/font&gt;&lt;div&gt;&lt;font size=&quot;3&quot;&gt;Web Application&lt;/font&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="30" width="210" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="Tu5mz0ddjPazwv8GgAfG-10" parent="1" style="points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];outlineConnect=0;gradientColor=none;html=1;whiteSpace=wrap;fontSize=12;fontStyle=0;container=1;pointerEvents=0;collapsible=0;recursiveResize=0;shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_on_premise;strokeColor=#7D8998;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontColor=#5A6C86;dashed=0;" value="&lt;font style=&quot;font-size: 24px;&quot;&gt;Private VM&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="220" x="400" y="660" as="geometry" />
+        </mxCell>
+        <mxCell id="Tu5mz0ddjPazwv8GgAfG-11" parent="Tu5mz0ddjPazwv8GgAfG-10" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;font style=&quot;font-size: 24px;&quot;&gt;10.0.3.0/24&lt;/font&gt;&lt;div&gt;&lt;font size=&quot;3&quot;&gt;Database&lt;/font&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="30" width="210" x="5" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="Tu5mz0ddjPazwv8GgAfG-12" edge="1" parent="1" style="shape=flexArrow;endArrow=classic;startArrow=classic;html=1;rounded=0;" value="">
+          <mxGeometry height="100" relative="1" width="100" as="geometry">
+            <mxPoint x="520" y="640" as="sourcePoint" />
+            <mxPoint x="440" y="450" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="Tu5mz0ddjPazwv8GgAfG-13" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;rotation=0;" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;80/443 Allowed in&lt;/font&gt;" vertex="1">
+          <mxGeometry height="40" width="200" x="80" y="460" as="geometry" />
+        </mxCell>
+        <mxCell id="Tu5mz0ddjPazwv8GgAfG-14" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;rotation=0;" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;Outbound only (NAT)&lt;/font&gt;" vertex="1">
+          <mxGeometry height="30" width="340" x="390" y="480" as="geometry" />
+        </mxCell>
+        <mxCell id="Tu5mz0ddjPazwv8GgAfG-15" parent="1" style="shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;" value="&lt;font style=&quot;font-size: 18px;&quot;&gt;Router VM&amp;nbsp;&lt;/font&gt;&lt;div&gt;&lt;span style=&quot;font-size: 18px;&quot;&gt;&lt;br&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 18px;&quot;&gt;&lt;br&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;font-size: 18px;&quot;&gt;&lt;br&gt;&lt;/span&gt;&lt;div&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;OS: Debian Netinst&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font size=&quot;3&quot;&gt;2GB RAM, 2 CPU Cores, 15GB Disk&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font size=&quot;3&quot;&gt;Adapter 1: NAT&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font size=&quot;3&quot;&gt;Adapter 2: Internal Network (public-net)&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font size=&quot;3&quot;&gt;Adabter 3: Internal Network (private-net)&lt;/font&gt;&lt;/div&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="220" width="380" x="730" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="Tu5mz0ddjPazwv8GgAfG-16" parent="1" style="points=[[0,0],[0.25,0],[0.5,0],[0.75,0],[1,0],[1,0.25],[1,0.5],[1,0.75],[1,1],[0.75,1],[0.5,1],[0.25,1],[0,1],[0,0.75],[0,0.5],[0,0.25]];outlineConnect=0;gradientColor=none;html=1;whiteSpace=wrap;fontSize=12;fontStyle=0;container=1;pointerEvents=0;collapsible=0;recursiveResize=0;shape=mxgraph.aws4.group;grIcon=mxgraph.aws4.group_on_premise;strokeColor=#7D8998;fillColor=none;verticalAlign=top;align=left;spacingLeft=30;fontColor=#5A6C86;dashed=0;" value="&lt;font style=&quot;font-size: 24px;&quot;&gt;Router VM&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="350" x="210" y="330" as="geometry" />
+        </mxCell>
+        <mxCell id="Tu5mz0ddjPazwv8GgAfG-17" parent="Tu5mz0ddjPazwv8GgAfG-16" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;span style=&quot;font-size: medium;&quot;&gt;Gateway - NAT - Firewall - Suricata IDS&lt;/span&gt;" vertex="1">
+          <mxGeometry height="30" width="330" y="50" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

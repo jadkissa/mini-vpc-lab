@@ -2,7 +2,7 @@
 
 A local, AWS-style cloud networking lab built on VirtualBox. It recreates the core ideas of an AWS VPC (public and private subnets, an internet gateway, NAT, route tables, security groups, a bastion host) using real Debian virtual machines, so the concepts can be learned and practiced without an AWS account.
 
-> Status: work in progress. The network, firewall, access paths and the database tier are working. The application tier (Docker services) is next. See the [Roadmap](#roadmap).
+> Status: work in progress. The network, firewall, access paths, database tier and a demo application (FastAPI in Docker behind Nginx) are working. Intrusion detection and automation are next. See the [Roadmap](#roadmap).
 
 ## Why this project
 
@@ -67,7 +67,9 @@ The private subnet uses 10.0.3.0/24 on purpose: VirtualBox's default NAT network
 | Route tables | Default routes on each VM pointing to the router |
 | Security groups | nftables forward chain with default-deny and explicit allows |
 | EC2 instances | The three Debian VMs |
-| RDS in a private subnet | PostgreSQL on private-vm, one database and one user per service |
+| Application Load Balancer | Nginx reverse proxy on public-vm |
+| ECS / container workload | The application container (Docker) on public-vm |
+| RDS in a private subnet | PostgreSQL on private-vm, with a dedicated database and user for the application |
 | Bastion host | public-vm as the SSH jump host |
 | GuardDuty / network monitoring (planned) | Suricata IDS on the router |
 
@@ -95,6 +97,17 @@ The private subnet uses 10.0.3.0/24 on purpose: VirtualBox's default NAT network
 
 Full rules: [`router-vm/etc/nftables.conf`](router-vm/etc/nftables.conf).
 
+## Demo application
+
+A small FastAPI service (see [`app/`](app/)) that records visits in PostgreSQL. Calling it from the host exercises the whole path: router DNAT, Nginx, the Docker container, the firewall between the subnets, and the database on the private subnet.
+
+```
+curl http://192.168.56.10/healthz                # service is up
+curl http://192.168.56.10/db-check               # database reachable through the firewall
+curl -X POST http://192.168.56.10/visits         # records a visit
+curl http://192.168.56.10/visits                 # {"total": N, "last_visit": "..."}
+```
+
 ## Roadmap
 
 - [x] Phase 0: Design the topology and addressing plan
@@ -104,8 +117,8 @@ Full rules: [`router-vm/etc/nftables.conf`](router-vm/etc/nftables.conf).
 - [x] Phase 4a: private-vm: install, verify outbound-only access
 - [x] Phase 5: Access paths: SSH from the host through the router and the bastion (ProxyJump)
 - [x] Phase 6: Security groups: default-deny forward policy with explicit allows, tested both ways
-- [x] Phase 4b: PostgreSQL on private-vm: two databases with separate users, listening on its internal address only, access limited by pg_hba and the firewall
-- [ ] Phase 7: Run the two FastAPI services (Docker) on public-vm against their databases, behind Nginx
+- [x] Phase 4b: PostgreSQL on private-vm: a database and a dedicated user for the application, listening on its internal address only, access limited by pg_hba and the firewall
+- [x] Phase 7: Demo application (FastAPI in Docker) on public-vm, behind an Nginx reverse proxy, storing data in PostgreSQL on private-vm
 - [ ] Phase 8: Intrusion detection with Suricata on the router (IDS mode first)
 - [ ] Phase 9: Automation (Vagrant and/or Ansible)
 - [ ] Phase 10: Reproduce the architecture on real AWS with Terraform
@@ -114,6 +127,7 @@ Full rules: [`router-vm/etc/nftables.conf`](router-vm/etc/nftables.conf).
 
 - [Setup guide](docs/setup-guide.md): step-by-step build instructions
 - [Troubleshooting](docs/troubleshooting.md): problems met along the way and how they were solved
+- [app](app/): the demo application (FastAPI) and its Dockerfile
 - [router-vm](router-vm/), [public-vm](public-vm/), [private-vm](private-vm/): per-VM notes and the configuration files used on each machine (paths mirror the real paths inside the VM)
 
 ## AWS SAA topics this lab covers
@@ -132,6 +146,11 @@ Each VM has its own folder. Files under `etc/` sit at the same path they have in
 ```
 mini-vpc-lab/
   README.md
+  .gitignore
+  app/                         demo application (FastAPI) and its Dockerfile
+    main.py  models.py  schemas.py  database.py
+    Dockerfile  requirements.txt  .dockerignore  .env.example
+    README.md
   docs/
     setup-guide.md
     troubleshooting.md
@@ -145,6 +164,7 @@ mini-vpc-lab/
     README.md
     etc/
       apt/sources.list
+      nginx/sites-available/lab-api
   private-vm/
     README.md
     etc/

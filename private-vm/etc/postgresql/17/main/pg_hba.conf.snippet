@@ -1,7 +1,9 @@
 # Excerpt for /etc/postgresql/17/main/pg_hba.conf
-# Add these lines after the existing rules, then: sudo systemctl reload postgresql
-# Each user may connect only to its own database, only from public-vm (/32 = one host).
+# Add this line after the existing rules, then: sudo systemctl reload postgresql
+# The application user may connect only to its own database, only from public-vm (/32 = one host).
+#
+# Note: rules for product_db / order_db from an earlier iteration may still exist on the VM.
+# They are not used by the demo application and can be removed together with those databases.
 
-# TYPE  DATABASE     USER          ADDRESS        METHOD
-host    product_db   product_user  10.0.1.10/32   scram-sha-256
-host    order_db     order_user    10.0.1.10/32   scram-sha-256
+# TYPE  DATABASE  USER      ADDRESS        METHOD
+host    app_db    app_user  10.0.1.10/32   scram-sha-256

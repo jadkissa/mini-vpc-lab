@@ -1,1 +1,19 @@
-/ignore
+# secrets
+.env
+.env.*
+!.env.example
+*.env
+
+# python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# editors / OS
+.vscode/
+.idea/
+.DS_Store
+
+# archives
+*.zip
