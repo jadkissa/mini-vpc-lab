@@ -1,0 +1,6 @@
+# Local rules for the Mini-VPC lab.
+# SIDs from 1,000,000 upwards are reserved for local rules.
+
+# TCP SYN scan detector: more than 20 SYN packets from one source within 10 seconds
+# towards the protected subnet (HOME_NET). One alert per source every 10 seconds.
+alert tcp any any -> $HOME_NET any (msg:"LAB Possible TCP port scan"; flags:S,12; threshold: type both, track by_src, count 20, seconds 10; classtype:attempted-recon; sid:1000001; rev:1;)

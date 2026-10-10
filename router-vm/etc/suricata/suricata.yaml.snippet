@@ -1,0 +1,20 @@
+# Excerpts for /etc/suricata/suricata.yaml
+# Edit the existing lines (do not replace the file). Keep a backup first:
+#   sudo cp /etc/suricata/suricata.yaml /etc/suricata/suricata.yaml.bak
+
+# 1. Protected network (around line 18). Comment out the default HOME_NET line
+#    and use the private subnet only.
+vars:
+  address-groups:
+    HOME_NET: "[10.0.3.0/24]"
+
+# 2. Interface to monitor (af-packet section, around line 622).
+#    The default is eth0, which does not exist on this router.
+af-packet:
+  - interface: enp0s8
+
+# 3. Load the local rules in addition to the downloaded ones (around line 2199).
+#    The indentation must match the existing line (two spaces before the dash).
+rule-files:
+  - suricata.rules
+  - /etc/suricata/rules/local.rules

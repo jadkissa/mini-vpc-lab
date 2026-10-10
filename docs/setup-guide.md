@@ -197,16 +197,17 @@ The input chain stays open while building the lab so an error does not lock you 
 | private-vm | `sudo apt update` | Works (outbound NAT) |
 | private-vm | `curl -m 3 -sS http://10.0.1.10` | Times out (dropped) |
 
-## 8. PostgreSQL on private-vm (database per service)
+## 8. PostgreSQL on private-vm
 
-Install and create one database and one user per service. The SQL is in [`private-vm/sql/create-databases.sql`](../private-vm/sql/create-databases.sql). Set each password interactively so it never appears in files or shell history:
+Install PostgreSQL and create a database and a dedicated user for the application. The SQL is in [`private-vm/sql/create-databases.sql`](../private-vm/sql/create-databases.sql). Set the password interactively so it never appears in files or shell history:
 
 ```
 sudo apt install postgresql
+sudo -u postgres psql -f create-databases.sql
 sudo -u postgres psql
 ```
 
-Inside `psql`: run the statements from the SQL file, then `\password product_user` and `\password order_user`. Check with `\l` and `\du`.
+Inside `psql`: `\password app_user`, then check with `\l` and `\du`.
 
 ### 8.1 Listen on the private address
 
@@ -225,14 +226,14 @@ Expected: `127.0.0.1:5432` and `10.0.3.10:5432` (plus `[::1]:5432`, which is loc
 
 ### 8.2 Who may connect (`pg_hba.conf`)
 
-Add the lines from the [snippet](../private-vm/etc/postgresql/17/main/pg_hba.conf.snippet) after the existing rules. Each user is limited to its own database and to the public VM (`/32` means a single host).
+Add the line from the [snippet](../private-vm/etc/postgresql/17/main/pg_hba.conf.snippet) after the existing rules. The user is limited to its own database and to the public VM (`/32` means a single host).
 
 ```
 sudo systemctl reload postgresql
 sudo -u postgres psql -c "select line_number, database, user_name, address, netmask, auth_method, error from pg_hba_file_rules;"
 ```
 
-The `error` column must be empty and the netmask of the new rules must be `255.255.255.255`.
+The `error` column must be empty and the netmask of the new rule must be `255.255.255.255`.
 
 ### 8.3 Firewall
 
@@ -247,16 +248,16 @@ sudo nft -c -f /etc/nftables.conf
 sudo nft -f /etc/nftables.conf
 ```
 
-### 8.4 Tests (from public-vm)
+### 8.4 Test (from public-vm)
 
 ```
 sudo apt install postgresql-client
-psql -h 10.0.3.10 -U product_user -d product_db   # connects (asks for the password)
-psql -h 10.0.3.10 -U product_user -d order_db     # refused: no pg_hba.conf entry
-psql -h 10.0.3.10 -U order_user -d product_db     # refused: no pg_hba.conf entry
+psql -h 10.0.3.10 -U app_user -d app_db      # connects (asks for the password)
 ```
 
-Docker will NAT container traffic, so connections from containers on public-vm reach the database with the public VM's own address (10.0.1.10), which matches the `pg_hba` and firewall rules.
+Running the same command on private-vm itself fails with "no pg_hba.conf entry", because the connection source would be 10.0.3.10, which is not allowed. On private-vm use `sudo -u postgres psql -d app_db` instead.
+
+Docker NATs container traffic, so connections from containers on public-vm reach the database with the public VM's own address (10.0.1.10), which matches the `pg_hba` and firewall rules.
 
 ## 9. Docker on public-vm
 
@@ -271,18 +272,178 @@ sudo usermod -aG docker $USER
 
 3. Log out and back in, then check `docker --version`.
 
-The services are built as images on the development machine and moved to the VM later, for example:
+## 10. The application and the Nginx reverse proxy
+
+The application source is in [`app/`](../app/) (see its README for the endpoints).
+
+### 10.1 Copy the code to public-vm
+
+Make sure the folder contains no `venv` or `__pycache__`. Validate the Python files first, because copy/paste errors only show up at run time:
 
 ```
-docker save <image> | gzip | ssh -J <user>@192.168.56.10 <user>@10.0.1.10 "gunzip | docker load"
+python3 -m py_compile app/main.py app/models.py app/schemas.py app/database.py
+scp -J <user>@192.168.56.10 -r app <user>@10.0.1.10:~/lab-api
 ```
 
-Secrets (database passwords) are passed to the containers as environment variables at run time and are not stored in images or in this repository.
+### 10.2 Build the image
 
-## 10. After a reboot
+On public-vm:
 
-Reboot the router and repeat the host test (`curl -I http://192.168.56.10`) to confirm that the rules in `/etc/nftables.conf` and the forwarding setting persist.
+```
+cd ~/lab-api
+docker build -t lab-api:latest .
+```
+
+### 10.3 Database settings (kept on the VM only)
+
+```
+nano ~/lab-api.env
+chmod 600 ~/lab-api.env
+```
+
+One line, no quotes (see `app/.env.example`):
+
+```
+DATABASE_URL=postgresql://app_user:<password>@10.0.3.10:5432/app_db
+```
+
+If the password has special characters (`@`, `:`, `/`) it must be URL-encoded; plain letters and digits avoid the problem.
+
+### 10.4 Run the container
+
+```
+docker run -d --name lab-api --restart unless-stopped \
+  --env-file ~/lab-api.env -p 127.0.0.1:8000:8000 lab-api:latest
+docker logs lab-api
+```
+
+Expected in the logs: `Application startup complete`. The port is bound to `127.0.0.1`, so the service is reachable only through Nginx. If you fix the code and rebuild, remove the old container first (`docker rm -f lab-api`), otherwise the restart policy keeps restarting the old one.
+
+### 10.5 Nginx reverse proxy
+
+Use [`public-vm/etc/nginx/sites-available/lab-api`](../public-vm/etc/nginx/sites-available/lab-api), then:
+
+```
+sudo cp lab-api /etc/nginx/sites-available/lab-api
+sudo rm /etc/nginx/sites-enabled/default
+sudo ln -s /etc/nginx/sites-available/lab-api /etc/nginx/sites-enabled/lab-api
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+`nginx -t` must report `syntax is ok` and `test is successful` before the reload. The default site is removed because both sites would declare `default_server` on port 80.
+
+### 10.6 Tests
+
+From public-vm:
+
+```
+curl http://localhost/healthz
+curl http://localhost/db-check
+```
+
+From the host (the full path: router DNAT, Nginx, container, firewall, database):
+
+```
+curl http://192.168.56.10/healthz
+curl http://192.168.56.10/db-check
+curl -X POST http://192.168.56.10/visits
+curl http://192.168.56.10/visits
+```
+
+Also open `http://192.168.56.10/docs` in a browser. To confirm the data lives in the database and not in the container:
+
+```
+psql -h 10.0.3.10 -U app_user -d app_db -c "select * from visits;"
+```
+
+## 11. Intrusion detection with Suricata (router-vm)
+
+Suricata runs on the router in IDS mode (alerts only). Design choices are explained in [`router-vm/README.md`](../router-vm/README.md).
+
+### 11.1 Install and load the rules
+
+```
+free -h                       # the router has 2 GB; Suricata with the full ruleset needs a good part of it
+sudo apt install suricata
+suricata -V
+sudo suricata-update          # downloads the Emerging Threats Open rules (about 53,000)
+```
+
+### 11.2 Configure
+
+Keep a backup, then edit three places in `/etc/suricata/suricata.yaml` (excerpts in [`router-vm/etc/suricata/suricata.yaml.snippet`](../router-vm/etc/suricata/suricata.yaml.snippet)):
+
+```
+sudo cp /etc/suricata/suricata.yaml /etc/suricata/suricata.yaml.bak
+```
+
+1. `HOME_NET` (around line 18): comment out the default line and set `"[10.0.3.0/24]"`, the protected private subnet.
+2. `af-packet` interface (around line 622): the default is `eth0`, which does not exist here. Set `enp0s8`.
+3. `rule-files` (around line 2199): add `- /etc/suricata/rules/local.rules` under `- suricata.rules`, with the same indentation.
+
+### 11.3 Add the local rule
+
+```
+sudo mkdir -p /etc/suricata/rules
+sudo cp router-vm/etc/suricata/rules/local.rules /etc/suricata/rules/local.rules
+```
+
+The rule alerts when one source sends more than 20 TCP SYN packets within 10 seconds to the protected subnet. The threshold makes one scan produce one alert instead of thousands.
+
+### 11.4 Validate and start
+
+```
+sudo suricata -T -v -c /etc/suricata/suricata.yaml
+```
+
+Always add `-v`: without it the "rules loaded" lines are hidden. Expected: `2 rule files processed` and no failed rules. If it still says `1 rule files processed`, the `rule-files` edit did not take effect.
+
+```
+sudo systemctl enable --now suricata
+sudo tail -n 15 /var/log/suricata/suricata.log
+```
+
+Wait for `Engine started` (about 30 seconds, it loads the whole ruleset) before testing.
+
+### 11.5 Test
+
+On the router:
+
+```
+sudo tail -f /var/log/suricata/fast.log
+```
+
+On public-vm:
+
+```
+sudo nmap -Pn -sS -p 1-1000 10.0.3.10
+```
+
+Use `-Pn`: without it nmap reports "Host seems down", because the firewall drops its discovery probes. Expected alert on the router:
+
+```
+[1:1000001:1] LAB Possible TCP port scan [**] [Classification: Attempted Information Leak] [Priority: 2] {TCP} 10.0.1.10:38992 -> 10.0.3.10:25
+```
+
+The destination port is one the firewall blocks, which shows that Suricata sees the packets before nftables drops them. To check that packets are captured at all:
+
+```
+sudo grep capture.kernel_packets /var/log/suricata/stats.log | tail -3
+```
+
+The number must grow while traffic flows.
+
+## 12. After a reboot
+
+Reboot the router and repeat the host test (`curl -I http://192.168.56.10`) to confirm that the rules in `/etc/nftables.conf` and the forwarding setting persist, and that Suricata is running again (`systemctl is-active suricata`). Reboot public-vm and check that the container (restart policy) and Nginx come back by themselves:
+
+```
+docker ps
+systemctl is-active nginx
+curl http://192.168.56.10/healthz
+```
 
 ## Next steps
 
-Run the two FastAPI services (Docker) on public-vm behind Nginx, Suricata on the router, then automation. See the roadmap in the README.
+Restricting the paths Nginx exposes, tightening the router's input chain, then automation. See the roadmap in the README.

@@ -2,7 +2,7 @@
 
 A local, AWS-style cloud networking lab built on VirtualBox. It recreates the core ideas of an AWS VPC (public and private subnets, an internet gateway, NAT, route tables, security groups, a bastion host) using real Debian virtual machines, so the concepts can be learned and practiced without an AWS account.
 
-> Status: work in progress. The network, firewall, access paths, database tier and a demo application (FastAPI in Docker behind Nginx) are working. Intrusion detection and automation are next. See the [Roadmap](#roadmap).
+> Status: work in progress. The network, firewall, access paths, database tier and a demo application (FastAPI in Docker behind Nginx) are working. Suricata detects port scans between the subnets. Hardening and automation are next. See the [Roadmap](#roadmap).
 
 ## Why this project
 
@@ -78,7 +78,7 @@ The private subnet uses 10.0.3.0/24 on purpose: VirtualBox's default NAT network
 | ECS / container workload | The application container (Docker) on public-vm |
 | RDS in a private subnet | PostgreSQL on private-vm, with a dedicated database and user for the application |
 | Bastion host | public-vm as the SSH jump host |
-| GuardDuty / network monitoring (planned) | Suricata IDS on the router |
+| GuardDuty / network threat detection | Suricata IDS on the router (monitors the public-net interface) |
 
 ## Environment
 
@@ -87,7 +87,7 @@ The private subnet uses 10.0.3.0/24 on purpose: VirtualBox's default NAT network
 
 | VM | Role | RAM | CPU | Disk |
 |---|---|---|---|---|
-| router | Gateway, NAT, firewall, later IDS | 2048 MB | 2 | 15 GB |
+| router | Gateway, NAT, firewall, Suricata IDS | 2048 MB | 2 | 15 GB |
 | public-vm | Web tier (Nginx, Docker) | 2048 MB | 1 | 10 GB |
 | private-vm | Database tier (PostgreSQL) | 1024 MB | 1 | 10 GB |
 
@@ -115,6 +115,18 @@ curl -X POST http://192.168.56.10/visits         # records a visit
 curl http://192.168.56.10/visits                 # {"total": N, "last_visit": "..."}
 ```
 
+## Intrusion detection
+
+Suricata runs on the router in IDS mode and watches the public-net interface. The protected network (`HOME_NET`) is the private subnet, so a scan from the web VM towards the database VM raises an alert, even though the firewall drops the packets. See [`router-vm/`](router-vm/) for the design choices and the test.
+
+```
+sudo nmap -Pn -sS -p 1-1000 10.0.3.10     # on public-vm
+```
+
+```
+[1:1000001:1] LAB Possible TCP port scan [**] ... {TCP} 10.0.1.10:38992 -> 10.0.3.10:25     # fast.log on the router
+```
+
 ## Roadmap
 
 - [x] Phase 0: Design the topology and addressing plan
@@ -126,7 +138,7 @@ curl http://192.168.56.10/visits                 # {"total": N, "last_visit": ".
 - [x] Phase 6: Security groups: default-deny forward policy with explicit allows, tested both ways
 - [x] Phase 4b: PostgreSQL on private-vm: a database and a dedicated user for the application, listening on its internal address only, access limited by pg_hba and the firewall
 - [x] Phase 7: Demo application (FastAPI in Docker) on public-vm, behind an Nginx reverse proxy, storing data in PostgreSQL on private-vm
-- [ ] Phase 8: Intrusion detection with Suricata on the router (IDS mode first)
+- [x] Phase 8: Intrusion detection with Suricata on the router (IDS mode, local port-scan rule tested)
 - [ ] Phase 9: Automation (Vagrant and/or Ansible)
 - [ ] Phase 10: Reproduce the architecture on real AWS with Terraform
 
@@ -170,6 +182,9 @@ mini-vpc-lab/
       network/interfaces
       nftables.conf
       sysctl.d/99-forward.conf
+      suricata/
+        suricata.yaml.snippet
+        rules/local.rules
   public-vm/
     README.md
     etc/
@@ -191,4 +206,5 @@ mini-vpc-lab/
 - Debian is used for all VMs for consistency (one OS, one set of commands).
 - LocalStack was considered, but it only emulates AWS APIs and does not teach real networking, so real VMs are used.
 - The firewall input chain on the router is still open (accept) so management access is not cut off while the lab is built. Tightening it is a planned hardening step.
+- Suricata runs in IDS mode (alerts only) on the public-net interface, so it sees scans that the firewall drops. The protected network (`HOME_NET`) is the private subnet only.
 - Between the public and private VMs only SSH (22) and PostgreSQL (5432) are allowed. The database port is opened from the public VM only, instead of using an SSH tunnel, which would be fragile with several services.
