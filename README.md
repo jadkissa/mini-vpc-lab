@@ -2,7 +2,7 @@
 
 A local, AWS-style cloud networking lab built on VirtualBox. It recreates the core ideas of an AWS VPC (public and private subnets, an internet gateway, NAT, route tables, security groups, a bastion host) using real Debian virtual machines, so the concepts can be learned and practiced without an AWS account.
 
-> Status: work in progress. The network, firewall, access paths, database tier and a demo application (FastAPI in Docker behind Nginx) are working. Suricata detects port scans between the subnets. Hardening and automation are next. See the [Roadmap](#roadmap).
+> Status: work in progress. The network, firewall, access paths, database tier and a demo application (FastAPI in Docker behind Nginx) are working. Suricata detects port scans between the subnets, and Nginx publishes only an allowlist of paths. Remaining hardening and automation are next. See the [Roadmap](#roadmap).
 
 ## Why this project
 
@@ -110,7 +110,7 @@ A small FastAPI service (see [`app/`](app/)) that records visits in PostgreSQL. 
 
 ```
 curl http://192.168.56.10/healthz                # service is up
-curl http://192.168.56.10/db-check               # database reachable through the firewall
+curl http://192.168.56.10/db-check               # 404: internal only, not published by Nginx
 curl -X POST http://192.168.56.10/visits         # records a visit
 curl http://192.168.56.10/visits                 # {"total": N, "last_visit": "..."}
 ```
@@ -139,6 +139,8 @@ sudo nmap -Pn -sS -p 1-1000 10.0.3.10     # on public-vm
 - [x] Phase 4b: PostgreSQL on private-vm: a database and a dedicated user for the application, listening on its internal address only, access limited by pg_hba and the firewall
 - [x] Phase 7: Demo application (FastAPI in Docker) on public-vm, behind an Nginx reverse proxy, storing data in PostgreSQL on private-vm
 - [x] Phase 8: Intrusion detection with Suricata on the router (IDS mode, local port-scan rule tested)
+- [x] Hardening: Nginx publishes only an allowlist of paths (`/healthz`, `/visits`); everything else returns 404
+- [ ] Hardening: tighten the router's input chain
 - [ ] Phase 9: Automation (Vagrant and/or Ansible)
 - [ ] Phase 10: Reproduce the architecture on real AWS with Terraform
 
@@ -207,4 +209,5 @@ mini-vpc-lab/
 - LocalStack was considered, but it only emulates AWS APIs and does not teach real networking, so real VMs are used.
 - The firewall input chain on the router is still open (accept) so management access is not cut off while the lab is built. Tightening it is a planned hardening step.
 - Suricata runs in IDS mode (alerts only) on the public-net interface, so it sees scans that the firewall drops. The protected network (`HOME_NET`) is the private subnet only.
+- Nginx uses an allowlist, a default-deny for paths like the firewall is for traffic: only `/healthz` and `/visits` are published (and only GET and POST on `/visits`). The API docs and `/db-check` stay on `127.0.0.1:8000` inside public-vm.
 - Between the public and private VMs only SSH (22) and PostgreSQL (5432) are allowed. The database port is opened from the public VM only, instead of using an SSH tunnel, which would be fragile with several services.

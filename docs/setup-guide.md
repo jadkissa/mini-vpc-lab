@@ -319,7 +319,7 @@ docker logs lab-api
 
 Expected in the logs: `Application startup complete`. The port is bound to `127.0.0.1`, so the service is reachable only through Nginx. If you fix the code and rebuild, remove the old container first (`docker rm -f lab-api`), otherwise the restart policy keeps restarting the old one.
 
-### 10.5 Nginx reverse proxy
+### 10.5 Nginx reverse proxy with an allowlist
 
 Use [`public-vm/etc/nginx/sites-available/lab-api`](../public-vm/etc/nginx/sites-available/lab-api), then:
 
@@ -333,25 +333,38 @@ sudo systemctl reload nginx
 
 `nginx -t` must report `syntax is ok` and `test is successful` before the reload. The default site is removed because both sites would declare `default_server` on port 80.
 
+The configuration is an allowlist: `location = /healthz` and `location = /visits` (with `limit_except GET POST`) proxy to the container, and a final `location /` returns 404 for everything else. An endpoint added to the application later stays hidden until it is allowed on purpose. The container listens only on `127.0.0.1:8000`, so `/docs` and `/db-check` remain available on the VM itself.
+
+Keep a backup before changing a working configuration (`sudo cp /etc/nginx/sites-available/lab-api /etc/nginx/sites-available/lab-api.bak`).
+
 ### 10.6 Tests
 
 From public-vm:
 
 ```
 curl http://localhost/healthz
-curl http://localhost/db-check
+curl http://localhost:8000/db-check      # internal check, straight to the container
 ```
 
 From the host (the full path: router DNAT, Nginx, container, firewall, database):
 
 ```
-curl http://192.168.56.10/healthz
-curl http://192.168.56.10/db-check
-curl -X POST http://192.168.56.10/visits
-curl http://192.168.56.10/visits
+curl -i http://192.168.56.10/healthz               # 200
+curl -i http://192.168.56.10/visits                # 200
+curl -i -X POST http://192.168.56.10/visits        # 201
+curl -i -X DELETE http://192.168.56.10/visits      # 403
+curl -i http://192.168.56.10/docs                  # 404
+curl -i http://192.168.56.10/db-check              # 404
+curl -i http://192.168.56.10/openapi.json          # 404
 ```
 
-Also open `http://192.168.56.10/docs` in a browser. To confirm the data lives in the database and not in the container:
+To read the API docs during development, open an SSH tunnel and browse `http://localhost:8000/docs`:
+
+```
+ssh -J <user>@192.168.56.10 -L 8000:127.0.0.1:8000 <user>@10.0.1.10
+```
+
+To confirm the data lives in the database and not in the container:
 
 ```
 psql -h 10.0.3.10 -U app_user -d app_db -c "select * from visits;"

@@ -62,7 +62,7 @@ ping -c 2 deb.debian.org        # DNS works
 systemctl is-active nginx       # active
 docker logs lab-api             # Application startup complete
 curl http://localhost/healthz   # through Nginx
-curl http://localhost/db-check  # database reachable
+curl http://localhost:8000/db-check   # internal check, straight to the container (not exposed by Nginx)
 ssh <user>@10.0.3.10            # bastion access to private-vm works
 
 # direct database access (asks for the password)
@@ -71,7 +71,33 @@ psql -h 10.0.3.10 -U app_user -d app_db -c "select * from visits;"
 
 From the host: `curl http://192.168.56.10/healthz`, `curl -X POST http://192.168.56.10/visits`, `curl http://192.168.56.10/visits`.
 
+## Nginx exposure (allowlist)
+
+Nginx publishes only the paths users need and answers 404 for everything else, the same default-deny idea as the firewall. This is safer than blocking known paths: an endpoint added to the application later stays hidden until it is allowed on purpose.
+
+| Path | Result from outside |
+|---|---|
+| `/healthz` | 200 |
+| `/visits` | GET and POST allowed, any other method gives 403 |
+| `/docs`, `/openapi.json`, `/db-check`, anything else | 404 |
+
+The container listens on `127.0.0.1:8000`, so the internal endpoints are still reachable on the VM itself. To read the API docs during development, open an SSH tunnel from the host and browse `http://localhost:8000/docs`:
+
+```
+ssh -J <user>@192.168.56.10 -L 8000:127.0.0.1:8000 <user>@10.0.1.10
+```
+
+Tests from the host:
+
+```
+curl -i http://192.168.56.10/healthz               # 200
+curl -i http://192.168.56.10/visits                # 200
+curl -i -X POST http://192.168.56.10/visits        # 201
+curl -i -X DELETE http://192.168.56.10/visits      # 403
+curl -i http://192.168.56.10/docs                  # 404
+curl -i http://192.168.56.10/db-check              # 404
+```
+
 ## Planned
 
-- Restrict which paths Nginx exposes (`/docs`, `/db-check`).
 - HTTPS (port 443).
