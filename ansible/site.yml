@@ -1,0 +1,11 @@
+- name: Baseline for every VM
+  hosts: all
+  become: true
+  roles:
+    - common
+
+- name: Database tier
+  hosts: private
+  become: true
+  roles:
+    - private_vm

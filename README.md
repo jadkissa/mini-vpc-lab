@@ -2,7 +2,7 @@
 
 A local, AWS-style cloud networking lab built on VirtualBox. It recreates the core ideas of an AWS VPC (public and private subnets, an internet gateway, NAT, route tables, security groups, a bastion host) using real Debian virtual machines, so the concepts can be learned and practiced without an AWS account.
 
-> Status: work in progress. The network, firewall, access paths, database tier and a demo application (FastAPI in Docker behind Nginx) are working. Suricata detects port scans between the subnets, and Nginx publishes only an allowlist of paths. Remaining hardening and automation are next. See the [Roadmap](#roadmap).
+> Status: work in progress. The network, firewall, access paths, database tier and a demo application (FastAPI in Docker behind Nginx) are working. Suricata detects port scans between the subnets, Nginx publishes only an allowlist of paths, and Ansible automates the baseline and the database tier. The remaining Ansible roles are next. See the [Roadmap](#roadmap).
 
 ## Why this project
 
@@ -140,8 +140,11 @@ sudo nmap -Pn -sS -p 1-1000 10.0.3.10     # on public-vm
 - [x] Phase 7: Demo application (FastAPI in Docker) on public-vm, behind an Nginx reverse proxy, storing data in PostgreSQL on private-vm
 - [x] Phase 8: Intrusion detection with Suricata on the router (IDS mode, local port-scan rule tested)
 - [x] Hardening: Nginx publishes only an allowlist of paths (`/healthz`, `/visits`); everything else returns 404
-- [ ] Hardening: tighten the router's input chain
-- [ ] Phase 9: Automation (Vagrant and/or Ansible)
+- [ ] Optional hardening: tighten the router's input chain (currently open; known limitation, not planned for now)
+- [ ] Phase 9: Automation with Ansible (in progress)
+  - [x] Inventory with the router as jump host, `common` role (baseline for all VMs), `private_vm` role (PostgreSQL installation, listening address and `pg_hba` rule, with handlers)
+  - [ ] Database and user creation with Ansible Vault
+  - [ ] `router` role and `public_vm` role
 - [ ] Phase 10: Reproduce the architecture on real AWS with Terraform
 
 ## Documentation
@@ -149,6 +152,7 @@ sudo nmap -Pn -sS -p 1-1000 10.0.3.10     # on public-vm
 - [Setup guide](docs/setup-guide.md): step-by-step build instructions
 - [Troubleshooting](docs/troubleshooting.md): problems met along the way and how they were solved
 - [app](app/): the demo application (FastAPI) and its Dockerfile
+- [ansible](ansible/): automation with Ansible (roles, inventory example, how to run)
 - [router-vm](router-vm/), [public-vm](public-vm/), [private-vm](private-vm/): per-VM notes and the configuration files used on each machine (paths mirror the real paths inside the VM)
 
 ## AWS SAA topics this lab covers
@@ -168,6 +172,10 @@ Each VM has its own folder. Files under `etc/` sit at the same path they have in
 mini-vpc-lab/
   README.md
   .gitignore
+  ansible/                     automation with Ansible
+    ansible.cfg  site.yml  README.md
+    inventory/hosts.ini.example
+    roles/common  roles/private_vm
   app/                         demo application (FastAPI) and its Dockerfile
     main.py  models.py  schemas.py  database.py
     Dockerfile  requirements.txt  .dockerignore  .env.example
@@ -207,7 +215,7 @@ mini-vpc-lab/
 
 - Debian is used for all VMs for consistency (one OS, one set of commands).
 - LocalStack was considered, but it only emulates AWS APIs and does not teach real networking, so real VMs are used.
-- The firewall input chain on the router is still open (accept) so management access is not cut off while the lab is built. Tightening it is a planned hardening step.
+- The firewall input chain on the router is still open (accept) so management access is not cut off while the lab is built. Tightening it is left as an optional hardening step.
 - Suricata runs in IDS mode (alerts only) on the public-net interface, so it sees scans that the firewall drops. The protected network (`HOME_NET`) is the private subnet only.
 - Nginx uses an allowlist, a default-deny for paths like the firewall is for traffic: only `/healthz` and `/visits` are published (and only GET and POST on `/visits`). The API docs and `/db-check` stay on `127.0.0.1:8000` inside public-vm.
 - Between the public and private VMs only SSH (22) and PostgreSQL (5432) are allowed. The database port is opened from the public VM only, instead of using an SSH tunnel, which would be fragile with several services.

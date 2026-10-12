@@ -1,0 +1,18 @@
+# Copy to hosts.ini and replace <user> with your Linux username.
+# Ansible runs on the host machine. The internal VMs are reached through the
+# router (and, for private-vm, through public-vm) with SSH ProxyJump.
+#
+# The host is called router-vm, not router: a host and a group with the same
+# name make Ansible print a warning.
+
+[router]
+router-vm ansible_host=192.168.56.10
+
+[public]
+public-vm ansible_host=10.0.1.10 ansible_ssh_common_args='-o ProxyJump=<user>@192.168.56.10'
+
+[private]
+private-vm ansible_host=10.0.3.10 ansible_ssh_common_args='-o ProxyJump=<user>@192.168.56.10,<user>@10.0.1.10'
+
+[all:vars]
+ansible_user=<user>

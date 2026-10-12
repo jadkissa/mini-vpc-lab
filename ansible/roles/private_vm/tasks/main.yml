@@ -1,0 +1,24 @@
+- name: Install PostgreSQL
+  ansible.builtin.apt:
+    name: postgresql
+    state: present
+
+- name: Ensure PostgreSQL is running and enabled at boot
+  ansible.builtin.service:
+    name: postgresql
+    state: started
+    enabled: true
+
+- name: Listen on localhost and the private address
+  ansible.builtin.lineinfile:
+    path: /etc/postgresql/17/main/postgresql.conf
+    regexp: '^\s*#?\s*listen_addresses\s*='
+    line: "listen_addresses = 'localhost,10.0.3.10'"
+  notify: Restart PostgreSQL
+
+- name: Allow app_user to reach app_db from public-vm only
+  ansible.builtin.lineinfile:
+    path: /etc/postgresql/17/main/pg_hba.conf
+    regexp: '^host\s+app_db\s+app_user\s'
+    line: "host    app_db    app_user    10.0.1.10/32    scram-sha-256"
+  notify: Reload PostgreSQL

@@ -457,6 +457,19 @@ systemctl is-active nginx
 curl http://192.168.56.10/healthz
 ```
 
+## 13. Automation with Ansible
+
+The manual steps above can be applied with Ansible. Only the bootstrap stays manual (create the VM, install Debian, set the static IP, enable SSH). Everything after that is described in roles. See [`ansible/README.md`](../ansible/README.md) for the setup (SSH keys, inventory), the commands, and the roles that exist so far.
+
+```
+cd ansible
+ansible all -m ping
+ansible-playbook site.yml -K --check --diff
+ansible-playbook site.yml -K
+```
+
+Run the apply step twice: the second run must show `changed=0` everywhere.
+
 ## Next steps
 
-Restricting the paths Nginx exposes, tightening the router's input chain, then automation. See the roadmap in the README.
+Automating the remaining roles (database creation, router, web tier) with Ansible. Tightening the router's input chain is a known open point. See the roadmap in the README.
